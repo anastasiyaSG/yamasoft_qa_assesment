@@ -1,673 +1,344 @@
-# Roadtrippers QA Automation Framework
+# Roadtrippers QA Automation Assessment
 
-A comprehensive test automation framework for the Roadtrippers platform built with **Playwright** and **pytest**, following the **Page Object Model (POM)** pattern and **SOLID principles**.
+## Overview
 
----
+This repository contains my submission for the Automation QA Engineer technical assessment for Roadpass Digital.
 
-## 📋 Table of Contents
+The goal of the assessment was not only to automate several test scenarios, but also to demonstrate:
 
-1. [Quick Start](#quick-start)
-2. [Project Structure](#project-structure)
-3. [Environment Setup](#environment-setup)
-4. [Running Tests](#running-tests)
-5. [Test Markers](#test-markers)
-6. [Configuration](#configuration)
-7. [Architecture & Patterns](#architecture--patterns)
-8. [Areas for Improvement](#areas-for-improvement)
-9. [Troubleshooting](#troubleshooting)
+* test architecture decisions
+* maintainability considerations
+* scalability awareness
+* CI/CD understanding
+* practical trade-offs within a limited time budget
+
+The implementation focuses on building a clean and extensible automation foundation rather than maximizing the number of automated scenarios.
 
 ---
 
-## 🚀 Quick Start
+# Time Spent
 
-### Prerequisites
-- Python 3.10 or higher
-- pip (Python package manager)
+| Part   | Description                                       | Approx. Time |
+| ------ | ------------------------------------------------- | ------------ |
+| Part 1 | UI automation framework and test implementation   | ~5 hours     |
+| Part 2 | CI/CD strategy research and implementation        | ~2 hours     |
+| Part 3 | Performance/API investigation and experimentation | ~2 hours     |
 
-### Step 1: Create Virtual Environment
+**Total approximate time spent: ~9 hours**
+
+---
+
+# Deliverables
+
+## Part 1 — Automated Test Implementation
+
+* `tests/test_create_trip_PART_1.py`
+* `reports/report_PART_1.html`
+
+## Part 2 — CI/CD Integration Strategy
+
+* `CICD_part_2/`
+
+## Part 3 — Optional Bonus
+
+* `tests/test_API_PART_3.py`
+
+---
+
+# Technical Approach & Decisions
+
+## Framework Selection
+
+I selected **Playwright with Python + pytest** for this assessment.
+
+### Why Playwright
+
+I would currently recommend Playwright for modern web automation because it provides:
+
+* strong auto-waiting capabilities
+* stable browser automation APIs
+* excellent debugging support (traces, screenshots, videos)
+* parallel execution support
+* modern locator strategies
+* reliable handling of dynamic frontend applications
+
+### Why Python
+
+Python is currently my strongest automation language and allowed me to focus primarily on framework design, maintainability, readability, and testing strategy within the assessment time constraints.
+
+---
+
+# Implementation Strategy
+
+The implementation intentionally focuses on realistic automation engineering practices rather than only creating several passing tests.
+
+The framework includes:
+
+* Page Object Model (POM)
+* separation between pages, actions, and assertions
+* reusable fixtures and teardown handling
+* HTML reporting and Playwright traces
+* retry support
+* parallel execution support
+* environment-based configuration
+* UI and API test separation
+
+## Page Object Strategy
+
+All locators and UI interactions are isolated inside Page Object classes to improve maintainability and minimize test impact when UI changes occur.
+
+## Actions Layer
+
+An additional actions/business workflow layer was introduced to:
+
+* encapsulate reusable business logic
+* improve readability
+* centralize logging and exception handling
+* reduce duplicated workflows across tests
+
+## Assertion Strategy
+
+Tests primarily follow the AAA pattern:
+
+* Arrange
+* Act
+* Assert
+
+to keep scenarios readable and simplify failure analysis.
+
+## Stability & Synchronization
+
+The framework avoids arbitrary `sleep()` usage inside tests and instead relies on:
+
+* Playwright auto-waiting
+* explicit waits
+* stable locator strategies
+* proper synchronization patterns
+
+to reduce flaky execution behavior and improve execution stability.
+
+---
+
+# Scope & Trade-Offs
+
+Given the assessment time constraints, I intentionally prioritized:
+
+* framework structure
+* maintainability
+* scalability
+* debugging support
+* clean abstraction layers
+
+over exhaustive functional coverage.
+
+The goal was to demonstrate how I would structure a realistic automation project foundation rather than maximize the number of test cases within limited time.
+
+Some areas intentionally kept simpler:
+
+* advanced test data factories
+* complete CI implementation
+* large-scale parallel environment management
+* advanced reporting customization
+
+---
+
+# AI Usage & Practical Constraints
+
+I prefer being transparent about tooling usage during the assessment.
+
+The CircleCI configuration and CI/CD strategy research required additional learning because my direct hands-on experience is currently stronger with:
+
+* GitHub Actions
+* Bitbucket Pipelines
+
+rather than CircleCI specifically.
+
+AI assistance was used primarily for:
+
+* accelerating CircleCI syntax generation
+* validating configuration structure
+* researching best practices
+
+while still reviewing and understanding the generated implementation before including it in the submission.
+
+The goal was to keep the solution realistic and aligned with my actual engineering understanding rather than artificially over-engineering the implementation.
+
+---
+
+# Real-World Testing Considerations
+
+For reliable parallel execution in real environments, additional considerations would be required such as:
+
+* dedicated test accounts
+* isolated test data
+* environment stability
+* avoiding shared-state collisions
+* environment reservation during execution
+
+especially for UI-heavy end-to-end automation.
+
+Test data is currently centralized under the utilities layer, but could be further expanded into dedicated factories or fixture-driven datasets in a production-scale framework.
+
+---
+
+# Quick Start
+
+## Prerequisites
+
+* Python 3.10 or higher
+* pip (Python package manager)
+
+---
+
+## Setup
+
+### 1. Create Virtual Environment
+
 ```bash
 python -m venv venv
 ```
 
-### Step 2: Activate Virtual Environment
+### 2. Activate Virtual Environment
 
-**Windows (PowerShell):**
+#### Windows (PowerShell)
+
 ```powershell
 .\venv\Scripts\Activate.ps1
 ```
 
-**Windows (Command Prompt):**
+#### Windows (Command Prompt)
+
 ```cmd
 venv\Scripts\activate.bat
 ```
 
-**macOS/Linux:**
+#### macOS/Linux
+
 ```bash
 source venv/bin/activate
 ```
 
-### Step 3: Install Dependencies
+### 3. Install Dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
-### Step 4: Install Playwright Browsers
+### 4. Install Playwright Browsers
+
 ```bash
 playwright install
 ```
 
-### Step 5: Configure Environment
-Edit `.env` file with your test credentials:
+### 5. Configure Environment Variables
+
+Update the `.env` file:
+
 ```ini
 BASE_URL=https://maps.roadtrippers.com/
 USERNAME=your_test_username
 PASSWORD=your_test_password
 ```
 
-### Step 6: Run Tests
+### 6. Run Tests
+
 ```bash
 pytest tests/ -v
 ```
 
 ---
 
-## 📁 Project Structure
+# Running Tests
 
-```
-Part_1_automation/
-│
-├── pages/                          # Page Object Model (POM)
-│   ├── __init__.py
-│   ├── login_page.py              # Login page interactions
-│   ├── trip_creation_page.py      # Trip creation workflows
-│   └── my_trips_page.py           # Trip management page
-│
-├── actions/                        # High-level business logic
-│   ├── __init__.py
-│   ├── trip_creation.py           # Trip creation workflows
-│   ├── http_sessoion.py           # HTTP/API session management
-│   └── [custom_actions].py        # Additional business logic
-│
-├── tests/                          # Test suites
-│   ├── __init__.py
-│   ├── test_create_trip.py        # Trip creation tests
-│   ├── test_API.py                # API endpoint tests
-│   └── [test_*.py]                # Additional test files
-│
-├── utilities/                      # Helper functions & configurations
-│   ├── __init__.py
-│   ├── helpers.py                 # Common utility functions
-│   ├── all_destination.json       # Test data
-│   └── [other_utils].py
-│
-├── reports/                        # Test execution reports
-│   └── report.html                # HTML test report
-│
-├── traces/                         # Playwright traces & screenshots
-│   └── [test_name].zip/.png       # Debugging artifacts
-│
-├── conftest.py                     # pytest fixtures & configuration
-├── pytest.ini                      # pytest configuration file
-├── requirements.txt                # Python dependencies
-├── .env                           # Environment variables (git-ignored)
-├── .gitignore                     # Git ignore rules
-├── pyvenv.cfg                     # Virtual environment config
-└── README.md                      # This file
-```
+## Run All Tests
 
----
-
-## 🔧 Environment Setup
-
-### .env File Configuration
-Create or edit `.env` file in the project root:
-
-```ini
-# Application URL
-BASE_URL=https://maps.roadtrippers.com/
-
-# Test Account Credentials
-USERNAME=your_test_username@example.com
-PASSWORD=your_secure_password
-
-# Optional: Playwright Configuration
-HEADLESS=true
-BROWSER=chromium
-TIMEOUT=30000
-```
-
-### Loading Environment Variables
-The framework automatically loads `.env` using `python-dotenv`. Access variables in code:
-
-```python
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-base_url = os.getenv("BASE_URL")
-username = os.getenv("USERNAME")
-password = os.getenv("PASSWORD")
-```
-
----
-
-## 🧪 Running Tests
-
-### Basic Test Execution
-
-**Run all tests:**
 ```bash
 pytest tests/ -v
 ```
 
-**Run specific test file:**
-```bash
-pytest tests/test_create_trip.py -v
-```
+## Run Smoke Tests
 
-**Run specific test:**
-```bash
-pytest tests/test_create_trip.py::test_create_trip_no_registration -v
-```
-
-### Advanced Test Execution
-
-**Run with HTML report:**
-```bash
-pytest tests/ -v --html=reports/report.html --self-contained-html
-```
-
-**Run with automatic test retries (2 times):**
-```bash
-pytest tests/ -v --reruns 2 --reruns-delay 1
-```
-
-**Run in headless mode (faster, no UI):**
-```bash
-pytest tests/ -v --headless
-```
-
-**Run with specific browser:**
-```bash
-pytest tests/ -v --browser firefox
-```
-
-**Run with parallel execution (4 workers):**
-```bash
-pytest tests/ -v -n 4
-```
-
-**Run with timeout (30 seconds per test):**
-```bash
-pytest tests/ -v --timeout=30
-```
-
-**Combine multiple options:**
-```bash
-pytest tests/ -v --html=reports/report.html --reruns 2 -n 4 --browser chromium
-```
-
----
-
-## 🏷️ Test Markers
-
-Test markers help you run specific subsets of tests.
-
-### Available Markers
-
-| Marker | Description | Command |
-|--------|-------------|---------|
-| `smoke` | Quick validation tests | `pytest -m smoke` |
-| `negative` | Error handling tests | `pytest -m negative` |
-| `api` | API endpoint tests | `pytest -m api` |
-| `ui` | UI and E2E tests | `pytest -m ui` |
-| `regression` | Full regression suite | `pytest -m regression` |
-
-### Using Markers
-
-**Run only smoke tests:**
 ```bash
 pytest -m smoke -v
 ```
 
-**Run everything except API tests:**
+## Run Tests with HTML Report
+
 ```bash
-pytest -m "not api" -v
+pytest tests/ -v --html=reports/report.html --self-contained-html
 ```
 
-**Run smoke OR negative tests:**
+## Run Tests in Parallel
+
+Note: parallel execution support is included at framework level, but fully isolated execution would require multiple dedicated test accounts and isolated test data management in a real CI environment.
+
 ```bash
-pytest -m "smoke or negative" -v
+pytest tests/ -n 4
 ```
 
-**Run tests with specific marker AND in headless mode:**
+## Run Tests with Retries
+
 ```bash
-pytest -m smoke -v --headless
+pytest tests/ --reruns 2 --reruns-delay 1
 ```
 
 ---
 
-## ⚙️ Configuration
+# Reporting & Debugging
 
-### pytest.ini Configuration
+The framework includes:
 
-```ini
-[pytest]
-# Async configuration
-asyncio_mode = auto
-asyncio_default_fixture_loop_scope = function
+* HTML reports
+* Playwright traces
+* screenshots for debugging support
 
-# Test discovery
-testpaths = tests
-python_files = test_*.py
-python_classes = Test*
-python_functions = test_*
-
-# Markers
-markers =
-    smoke: Quick validation tests
-    negative: Error handling tests
-    api: API endpoint tests
-    ui: UI/E2E tests
-    regression: Full test suite
-
-# Reporting
-addopts = 
-    --html=reports/report.html
-    --self-contained-html
-    --capture=no
-    --color=yes
-    -v
-```
-
-### Command-Line Options
-
-Common pytest flags:
-
-| Option | Description |
-|--------|-------------|
-| `-v` / `--verbose` | Verbose output |
-| `-s` / `--capture=no` | Show print statements |
-| `-x` / `--exitfirst` | Stop on first failure |
-| `-k` `EXPRESSION` | Run tests matching expression |
-| `--lf` / `--last-failed` | Run only last failed tests |
-| `--tb=short` | Shorter traceback format |
-| `--collect-only` | List tests without running |
+These artifacts help improve failure investigation and reduce debugging time, especially in CI environments.
 
 ---
 
-## 🏗️ Architecture & Patterns
+# Metrics I Would Track in Real CI/CD Usage
 
-### Page Object Model (POM)
+To evaluate long-term automation effectiveness, I would track:
 
-**Benefits:**
-- ✅ Maintainability: UI changes only affect page objects
-- ✅ Reusability: Pages can be used across multiple tests
-- ✅ Clarity: Tests read like business workflows
+| Metric                 | Why It Matters                                       |
+| ---------------------- | ---------------------------------------------------- |
+| Test pass/fail rate    | Measures overall suite health and release confidence |
+| Flaky test frequency   | Helps identify unstable automation reducing CI trust |
+| Average execution time | Tracks pipeline scalability and feedback speed       |
+| Defect escape rate     | Measures how many issues bypass automated validation |
 
-**Example Page Object:**
-```python
-# pages/login_page.py
-class LoginPage:
-    def __init__(self, page):
-        self.page = page
-        self.username_input = page.locator("input[name='login']")
-        self.password_input = page.locator("input[name='password']")
-        self.submit_button = page.get_by_role("button", name="Log in")
-    
-    async def login(self, username: str, password: str) -> None:
-        """Fill login form and submit."""
-        await self.username_input.fill(username)
-        await self.password_input.fill(password)
-        await self.submit_button.click()
-```
+Additional useful metrics:
 
-**Usage in tests:**
-```python
-async def test_login(page) -> None:
-    login_page = LoginPage(page)
-    await login_page.login("user@example.com", "password")
-    # Assert logged-in state
-```
-
-### SOLID Principles Implementation
-
-#### 1. **Single Responsibility Principle (SRP)**
-- Pages handle UI interactions only
-- Actions orchestrate workflows
-- Tests validate behavior
-
-```python
-# ✅ Good: Single responsibility
-class LoginPage:
-    async def fill_username(self, username: str) -> None:
-        await self.username_input.fill(username)
-
-# ❌ Avoid: Multiple responsibilities
-class LoginPage:
-    async def login_and_check_dashboard(self, username: str) -> bool:
-        # Multiple concerns mixed
-```
-
-#### 2. **Open/Closed Principle (OCP)**
-- Extend with new actions, don't modify existing ones
-- Use composition over inheritance
-
-```python
-# ✅ Good: Composable actions
-class TripWorkflow:
-    def __init__(self, page):
-        self.login_page = LoginPage(page)
-        self.trip_page = TripCreationPage(page)
-```
-
-#### 3. **Liskov Substitution Principle (LSP)**
-- All page objects follow same interface patterns
-- Consistent method signatures
-
-```python
-# ✅ Good: Consistent interface
-class BasePage:
-    async def wait_for_page_load(self) -> None:
-        await self.page.wait_for_load_state("networkidle")
-```
-
-#### 4. **Interface Segregation Principle (ISP)**
-- Import only what you need
-- Avoid forcing tests to import unused pages
-
-```python
-# ✅ Good: Segmented imports
-from pages.login_page import LoginPage
-from pages.trip_creation_page import TripCreationPage
-
-# ❌ Avoid: Unnecessary imports
-from pages import * # Too broad
-```
-
-#### 5. **Dependency Inversion Principle (DIP)**
-- Inject dependencies (page object)
-- Don't create dependencies internally
-
-```python
-# ✅ Good: Dependency injection
-class LoginPage:
-    def __init__(self, page: Page):
-        self.page = page
-
-# ❌ Avoid: Creating within class
-class LoginPage:
-    def __init__(self):
-        self.page = create_page() # Creates dependency
-```
+* test coverage across critical workflows
+* failure categorization trends
+* mean time to diagnose failures
+* automation maintenance effort over time
+* CI pipeline stability trends
 
 ---
 
-## 🎯 Areas for Improvement
+# Future Improvements & Known Constraints
 
-### High Priority
+The API and performance-related examples included in Part 3 should be considered exploratory rather than production-ready implementations.
 
-#### 1. **Test Data Management**
-- [ ] Create `fixtures/test_data.py` with comprehensive test datasets
-- [ ] Implement data-driven testing using `@pytest.mark.parametrize`
-- [ ] Add setup/teardown for test data cleanup
+Due to assessment time constraints and external application dependencies (including dynamic request behavior and reCAPTCHA protections), the focus was placed primarily on demonstrating:
 
-**Example:**
-```python
-@pytest.mark.parametrize("destination", [
-    "New York",
-    "Los Angeles",
-    "Chicago"
-])
-async def test_trip_to_destination(page, destination):
-    # Test with multiple destinations
-```
+* framework structure
+* API investigation approach
+* traffic inspection strategy
+* initial performance testing direction
 
-#### 2. **Logging & Debugging**
-- [ ] Implement structured logging in all page objects
-- [ ] Add screenshot capture on test failures
-- [ ] Implement video recording for failed tests
+rather than building a fully stabilized API/performance testing solution.
 
-**Example:**
-```python
-import logging
+In a production environment, the next improvements would include:
 
-class LoginPage:
-    def __init__(self, page):
-        self.page = page
-        self.logger = logging.getLogger(__name__)
-    
-    async def login(self, username: str) -> None:
-        self.logger.info(f"Attempting login with {username}")
-        try:
-            await self.username_input.fill(username)
-            self.logger.info("Username filled successfully")
-        except Exception as e:
-            self.logger.error(f"Failed to fill username: {e}")
-            await page.screenshot(path="error.png")
-            raise
-```
+* dedicated API client abstraction
+* authenticated request handling
+* request/response schema validation
+* mocked or isolated test environments
+* stable test data management
+* reusable contract validation
+* improved observability and logging
+* more advanced k6 performance scenarios and thresholds
 
-#### 3. **Error Handling & Validation**
-- [ ] Add custom exceptions for test scenarios
-- [ ] Implement retry logic for flaky elements
-- [ ] Add explicit wait strategies
-
-**Example:**
-```python
-class PageNotLoadedError(Exception):
-    """Raised when page elements fail to load."""
-    pass
-
-async def wait_for_element_with_retry(locator, max_retries=3):
-    for attempt in range(max_retries):
-        try:
-            await locator.wait_for(timeout=5000)
-            return True
-        except TimeoutError:
-            if attempt == max_retries - 1:
-                raise PageNotLoadedError(f"Element not found after {max_retries} attempts")
-            await asyncio.sleep(1)
-```
-
-### Medium Priority
-
-#### 4. **Test Coverage & Reporting**
-- [ ] Implement coverage.py for code coverage analysis
-- [ ] Create custom HTML reports with graphs
-- [ ] Add test execution trends tracking
-
-**Commands:**
-```bash
-# Generate coverage report
-pytest --cov=pages --cov=actions --cov-report=html
-
-# Generate detailed report
-pytest --html=reports/report.html --self-contained-html
-```
-
-#### 5. **Cross-Browser Testing**
-- [ ] Expand browser support in conftest.py (Firefox, WebKit)
-- [ ] Add browser-specific workarounds
-- [ ] Implement browser matrix in CI/CD
-
-**Example:**
-```python
-@pytest.fixture(params=["chromium", "firefox", "webkit"])
-async def browser(request):
-    async with async_playwright() as p:
-        browser = await getattr(p, request.param).launch()
-        yield browser
-        await browser.close()
-```
-
-#### 6. **API Testing Enhancements**
-- [ ] Create dedicated API client class
-- [ ] Add request/response validation schemas
-- [ ] Implement API mock server for tests
-
-**Example:**
-```python
-class APIClient:
-    def __init__(self, base_url: str):
-        self.base_url = base_url
-    
-    async def get_trips(self, user_id: str) -> dict:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"{self.base_url}/users/{user_id}/trips") as resp:
-                return await resp.json()
-```
-
-### Lower Priority
-
-#### 7. **CI/CD Integration**
-- [ ] Set up GitHub Actions workflow
-- [ ] Implement automated test execution on push
-- [ ] Add test result artifacts to CI pipeline
-
-**Example (.github/workflows/tests.yml):**
-```yaml
-name: Test Suite
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-      - run: pip install -r requirements.txt
-      - run: playwright install
-      - run: pytest tests/ --html=report.html
-      - uses: actions/upload-artifact@v2
-```
-
-#### 8. **Performance Optimization**
-- [ ] Profile test execution time
-- [ ] Optimize slow page operations
-- [ ] Implement parallel execution strategy
-
-**Commands:**
-```bash
-# Run with parallel execution (4 workers)
-pytest -n 4
-
-# Measure test duration
-pytest --durations=10
-```
-
-#### 9. **Documentation & Maintenance**
-- [ ] Add API documentation for page objects
-- [ ] Create troubleshooting guide
-- [ ] Document common issues and solutions
-
----
-
-## 🛠️ Troubleshooting
-
-### Common Issues
-
-#### Issue: `ModuleNotFoundError: No module named 'playwright'`
-**Solution:**
-```bash
-pip install -r requirements.txt
-playwright install
-```
-
-#### Issue: `asyncio.TimeoutError` on element interaction
-**Solution:**
-```python
-# Increase timeout for slower environments
-await page.goto(url, timeout=60000)
-await element.click(timeout=10000)
-```
-
-#### Issue: Tests fail locally but pass in CI
-**Common causes:**
-1. Credentials in `.env` not configured correctly
-2. Different screen resolution (use responsive design)
-3. Headless vs headed mode differences
-
-**Debug:**
-```bash
-# Run with debug output
-pytest -v -s --capture=no
-
-# Run without headless
-pytest -v --headed
-```
-
-#### Issue: Element not found in headed mode
-**Solution:**
-Add explicit waits before interactions:
-```python
-await page.wait_for_timeout(1000)  # Brief wait
-await element.wait_for(timeout=5000)
-```
-
-#### Issue: Tests timeout after 30 seconds
-**Solution:**
-```bash
-# Increase timeout per test
-pytest --timeout=60
-
-# Or in conftest.py
-import pytest_timeout
-pytest_timeout.set_timeout(60)
-```
-
----
-
-## 📚 Resources
-
-- [Playwright Documentation](https://playwright.dev/python/)
-- [pytest Documentation](https://docs.pytest.org/)
-- [pytest-asyncio](https://pytest-asyncio.readthedocs.io/)
-- [Page Object Models](https://playwright.dev/python/docs/pom)
-- [SOLID Principles](https://en.wikipedia.org/wiki/SOLID)
-
----
-
-## 📝 Quick Reference
-
-### Running Tests - Command Cheat Sheet
-
-```bash
-# Basic
-pytest tests/                              # Run all tests
-pytest tests/test_create_trip.py           # Run file
-pytest tests/test_create_trip.py::test_*   # Run specific test
-
-# Markers
-pytest -m smoke                            # Smoke tests only
-pytest -m "not api"                        # Everything except API
-
-# Reporting
-pytest --html=report.html                  # Generate HTML report
-pytest --tb=short                          # Short traceback
-
-# Advanced
-pytest -n 4                                # Parallel (4 workers)
-pytest --reruns 2                          # Retry 2 times on failure
-pytest -v -s                               # Verbose + show prints
-pytest --collect-only                      # List tests only
-pytest --lf                                # Last failed only
-
-# Combined
-pytest -m smoke -v --html=report.html --reruns 2
-```
-
----
-
-## 🔗 Support & Contributions
-
-For issues or questions:
-1. Check the [Troubleshooting](#troubleshooting) section
-2. Review test logs in `reports/` and `traces/`
-3. Run tests with verbose output: `pytest -v -s`
-
----
-
-**Last Updated:** May 2026  
-**Maintainer:** QA Automation Team  
-**Framework Version:** Playwright + pytest  
-**Python Version:** 3.10+
+The current implementation should therefore be viewed as a foundational starting point intended to demonstrate technical direction and testing strategy rather than complete production coverage.
