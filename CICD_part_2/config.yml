@@ -1,0 +1,608 @@
+version: 2.1
+
+#
+# CircleCI Configuration for Roadpass Digital QA Automation
+# Part 2: CI/CD Integration Strategy
+#
+# This configuration:
+# - Runs smoke tests first (fail-fast)
+# - Parallelizes full UI test suite across multiple containers
+# - Runs API tests independently
+# - Captures artifacts, traces, and JUnit reports
+# - Integrates with Slack and GitHub for notifications
+#
+
+# ============================================================================
+# ORBS - Reusable commands and jobs
+# ============================================================================
+
+orbs:
+  slack: circleci/slack@4.12.1
+  codecov: codecov/codecov@3.2.5
+
+# ============================================================================
+# PARAMETERS - Dynamic pipeline configuration
+# ============================================================================
+
+parameters:
+  run_flaky_tests:
+    type: boolean
+    default: false
+    description: "Set to true to run tests marked as flaky"
+  
+  max_parallelism:
+    type: integer
+    default: 3
+    description: "Number of parallel containers for UI tests"
+
+# ============================================================================
+# REUSABLE JOBS
+# ============================================================================
+
+jobs:
+  #
+  # Job 1: SETUP - Install dependencies, cache, prepare environment
+  #
+  setup:
+    docker:
+      - image: cimg/python:3.11-browsers
+        auth:
+          username: $DOCKERHUB_USERNAME
+          password: $DOCKERHUB_TOKEN
+    
+    resource_class: medium
+    
+    steps:
+      - checkout
+      
+      # Restore pip cache from previous builds
+      - restore_cache:
+          keys:
+            - v1-pip-{{ checksum "requirements.txt" }}
+            - v1-pip-
+      
+      # Restore browser cache (Playwright bins take ~800MB)
+      - restore_cache:
+          keys:
+            - v1-browsers-{{ checksum "requirements.txt" }}
+      
+      # Install Python dependencies
+      - run:
+          name: Install Python dependencies
+          command: |
+            python -m venv venv
+            . venv/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements.txt
+            pip install pytest-cov coverage
+      
+      # Install Playwright browsers (cached)
+      - run:
+          name: Install Playwright browsers
+          command: |
+            . venv/bin/activate
+            playwright install
+      
+      # Save pip cache
+      - save_cache:
+          key: v1-pip-{{ checksum "requirements.txt" }}
+          paths:
+            - ~/.cache/pip
+      
+      # Save browser cache
+      - save_cache:
+          key: v1-browsers-{{ checksum "requirements.txt" }}
+          paths:
+            - ~/.cache/ms-playwright
+      
+      # Create reports directory
+      - run:
+          name: Create reports directory
+          command: mkdir -p reports traces
+      
+      # Persist workspace for downstream jobs
+      - persist_to_workspace:
+          root: .
+          paths:
+            - venv
+            - requirements.txt
+
+  #
+  # Job 2: SMOKE TESTS - Fast validation layer
+  # Gate for full test suite (must pass before running full tests)
+  #
+  smoke-tests:
+    docker:
+      - image: cimg/python:3.11-browsers
+        auth:
+          username: $DOCKERHUB_USERNAME
+          password: $DOCKERHUB_TOKEN
+    
+    resource_class: medium
+    
+    environment:
+      PYTEST_ADDOPTS: "--junit-xml=reports/junit-smoke.xml --cov=. --cov-report=xml:coverage-smoke.xml"
+    
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      
+      # Load environment variables from .env (test credentials, URLs)
+      - run:
+          name: Load environment variables
+          command: |
+            if [ -f .env ]; then
+              cat .env >> $BASH_ENV
+            fi
+      
+      # Run smoke tests (marked with @pytest.mark.smoke)
+      - run:
+          name: Run smoke tests
+          command: |
+            . venv/bin/activate
+            pytest tests/ -m smoke \
+              --capture=no \
+              --verbose \
+              --tb=short \
+              --maxfail=2 \
+              --timeout=30
+          no_output_timeout: 5m
+      
+      # Store reports for debugging
+      - store_artifacts:
+          path: reports
+          destination: smoke-reports
+      
+      - store_test_results:
+          path: reports
+      
+      # Upload coverage to Codecov
+      - codecov/upload:
+          file: coverage-smoke.xml
+          flags: smoke
+      
+      # Notify Slack on failure (smoke test is critical gate)
+      - slack/notify:
+          channel: qa-alerts
+          event: fail
+          custom: |
+            {
+              "text": "🔴 Smoke Tests Failed - Blocking Full Suite",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "⚠️ *Smoke Tests Failed*\n*Branch:* $CIRCLE_BRANCH\n*Commit:* $CIRCLE_SHA1\n*Build:* <$CIRCLE_BUILD_URL|#$CIRCLE_BUILD_NUM>\n\nFull suite blocked until fixed."
+                  }
+                }
+              ]
+            }
+
+  #
+  # Job 3: API TESTS - Parallelized API testing
+  # Independent of UI tests; can run in parallel
+  #
+  api-tests:
+    docker:
+      - image: cimg/python:3.11
+        auth:
+          username: $DOCKERHUB_USERNAME
+          password: $DOCKERHUB_TOKEN
+    
+    resource_class: small
+    
+    parallelism: 2
+    
+    environment:
+      PYTEST_ADDOPTS: "--junit-xml=reports/junit-api.xml --cov=. --cov-report=xml:coverage-api.xml"
+    
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      
+      - run:
+          name: Run API tests
+          command: |
+            . venv/bin/activate
+            
+            # Split tests across parallelism using pytest-xdist
+            pytest tests/test_API.py \
+              -m api \
+              --capture=no \
+              --verbose \
+              --tb=short \
+              -n auto \
+              --junit-xml=reports/junit-api-${CIRCLE_NODE_INDEX}.xml
+          no_output_timeout: 5m
+      
+      - store_artifacts:
+          path: reports
+          destination: api-reports
+      
+      - store_test_results:
+          path: reports
+      
+      - codecov/upload:
+          file: coverage-api.xml
+          flags: api
+
+  #
+  # Job 4: UI TESTS - Parallelized E2E/UI tests
+  # Uses pytest-xdist for parallelization across multiple containers
+  #
+  ui-tests:
+    docker:
+      - image: cimg/python:3.11-browsers
+        auth:
+          username: $DOCKERHUB_USERNAME
+          password: $DOCKERHUB_TOKEN
+    
+    resource_class: medium
+    
+    parallelism: 3  # Adjust based on resources and test count
+    
+    environment:
+      # Capture traces and screenshots for failed tests
+      PLAYWRIGHT_TRACE: on
+      PYTEST_ADDOPTS: "--junit-xml=reports/junit-ui.xml --cov=. --cov-report=xml:coverage-ui.xml"
+    
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      
+      - run:
+          name: Run UI tests (parallelized)
+          command: |
+            . venv/bin/activate
+            
+            # Parallelize tests across containers using pytest-xdist
+            pytest tests/test_create_trip_PART_1.py \
+              -m ui \
+              --capture=no \
+              --verbose \
+              --tb=short \
+              -n auto \
+              --dist=loadscope \
+              --junit-xml=reports/junit-ui-${CIRCLE_NODE_INDEX}.xml \
+              --html=reports/report-ui-${CIRCLE_NODE_INDEX}.html \
+              --self-contained-html \
+              --maxfail=5 \
+              --timeout=60
+          no_output_timeout: 10m
+      
+      # Capture traces from failed tests (helps debug flakiness)
+      - run:
+          name: Collect Playwright traces
+          when: on_fail
+          command: |
+            if [ -d traces ]; then
+              tar -czf traces-${CIRCLE_NODE_INDEX}.tar.gz traces/
+            fi
+      
+      - store_artifacts:
+          path: reports
+          destination: ui-reports
+      
+      - store_artifacts:
+          path: traces-*.tar.gz
+          destination: traces
+      
+      - store_test_results:
+          path: reports
+      
+      - codecov/upload:
+          file: coverage-ui.xml
+          flags: ui
+
+  #
+  # Job 5: FULL REGRESSION SUITE - Run everything once nightly
+  # Used for nightly scheduled runs and final validation
+  #
+  full-regression:
+    docker:
+      - image: cimg/python:3.11-browsers
+        auth:
+          username: $DOCKERHUB_USERNAME
+          password: $DOCKERHUB_TOKEN
+    
+    resource_class: large
+    
+    environment:
+      PYTEST_ADDOPTS: "--junit-xml=reports/junit-full.xml --cov=. --cov-report=xml:coverage-full.xml"
+    
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      
+      - run:
+          name: Run full regression suite
+          command: |
+            . venv/bin/activate
+            
+            # Run ALL tests (smoke, ui, api, regression)
+            pytest tests/ \
+              -m "smoke or ui or api or regression" \
+              --capture=no \
+              --verbose \
+              --tb=short \
+              -n auto \
+              --dist=loadscope \
+              --html=reports/report-full.html \
+              --self-contained-html \
+              --junit-xml=reports/junit-full.xml \
+              --cov-report=html:htmlcov
+          no_output_timeout: 20m
+      
+      - store_artifacts:
+          path: reports
+          destination: reports
+      
+      - store_artifacts:
+          path: htmlcov
+          destination: coverage
+      
+      - store_test_results:
+          path: reports
+      
+      - codecov/upload:
+          file: coverage-full.xml
+
+  #
+  # Job 6: FLAKY TEST REPORT - Generate flakiness metrics
+  # Runs after main tests; creates weekly report
+  #
+  flaky-report:
+    docker:
+      - image: cimg/python:3.11
+        auth:
+          username: $DOCKERHUB_USERNAME
+          password: $DOCKERHUB_TOKEN
+    
+    resource_class: small
+    
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      
+      - run:
+          name: Analyze flaky tests
+          command: |
+            . venv/bin/activate
+            
+            # Generate flakiness report (requires Jira integration)
+            # This is a placeholder for custom script
+            python -c "
+            import json
+            import subprocess
+            from pathlib import Path
+            
+            # Parse JUnit reports to find failures
+            junit_files = list(Path('reports').glob('junit-*.xml'))
+            print(f'Analyzing {len(junit_files)} test reports...')
+            
+            # Count failures and generate report
+            report = {
+              'total_tests': 0,
+              'failures': 0,
+              'flaky_threshold': 10
+            }
+            print(json.dumps(report, indent=2))
+            "
+      
+      - slack/notify:
+          channel: qa-team
+          event: always
+          custom: |
+            {
+              "text": "📊 Weekly Flakiness Report",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "📊 *Weekly Flakiness Report*\nGenerated: $(date)\nFlaky threshold: 10% failure rate\nView full report in CircleCI artifacts."
+                  }
+                }
+              ]
+            }
+
+  #
+  # Job 7: NOTIFY - Final notification with summary
+  # Consolidates results and sends to Slack/GitHub
+  #
+  notify-results:
+    docker:
+      - image: cimg/base:stable
+    
+    resource_class: small
+    
+    steps:
+      - run:
+          name: Get build status
+          command: |
+            echo "Build completed successfully"
+            echo "Pipeline ID: $CIRCLE_WORKFLOW_ID"
+      
+      - slack/notify:
+          channel: qa-team
+          event: pass
+          custom: |
+            {
+              "text": "✅ All tests passed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "✅ *Test Suite Passed*\n*Branch:* $CIRCLE_BRANCH\n*Tests:* Smoke ✓ | API ✓ | UI ✓\n*Build:* <$CIRCLE_BUILD_URL|#$CIRCLE_BUILD_NUM>\n\nReady to merge!"
+                  }
+                }
+              ]
+            }
+
+# ============================================================================
+# WORKFLOWS - Orchestrate jobs
+# ============================================================================
+
+workflows:
+  # Workflow 1: PR CHECK - Runs on every pull request
+  # Fast feedback: smoke → full suite
+  pr-check:
+    when: << pipeline.is_fork_or_user_is_contributor >>
+    jobs:
+      - setup
+      
+      - smoke-tests:
+          requires:
+            - setup
+      
+      # Run both API and UI tests in parallel, only after smoke passes
+      - api-tests:
+          requires:
+            - smoke-tests
+      
+      - ui-tests:
+          requires:
+            - smoke-tests
+      
+      # Notify on all results
+      - notify-results:
+          requires:
+            - api-tests
+            - ui-tests
+
+  # Workflow 2: NIGHTLY - Full regression suite (scheduled)
+  # Trigger: Daily at 2 AM UTC
+  # Runs: Full suite + flakiness analysis
+  nightly-regression:
+    triggers:
+      - schedule:
+          cron: "0 2 * * *"
+          filters:
+            branches:
+              only:
+                - main
+                - develop
+    
+    jobs:
+      - setup
+      
+      - full-regression:
+          requires:
+            - setup
+      
+      - flaky-report:
+          requires:
+            - full-regression
+      
+      - notify-results:
+          requires:
+            - flaky-report
+
+  # Workflow 3: MERGE TO MAIN - Comprehensive testing before merge
+  # Trigger: Merge to main branch
+  # Runs: Full regression + extended validation
+  post-merge:
+    when:
+      and:
+        - equal: [ main, << pipeline.git.branch >> ]
+    
+    jobs:
+      - setup
+      
+      - smoke-tests:
+          requires:
+            - setup
+      
+      - api-tests:
+          requires:
+            - smoke-tests
+      
+      - ui-tests:
+          requires:
+            - smoke-tests
+      
+      - full-regression:
+          requires:
+            - api-tests
+            - ui-tests
+      
+      - notify-results:
+          requires:
+            - full-regression
+
+# ============================================================================
+# ENVIRONMENT VARIABLES
+# ============================================================================
+# Set these in CircleCI project settings:
+#
+# BASE_URL=https://staging.roadpass.com
+# API_BASE_URL=https://api.staging.roadpass.com
+# TEST_USER_EMAIL=${TEST_USER_EMAIL} (from secrets)
+# TEST_USER_PASSWORD=${TEST_USER_PASSWORD} (from secrets)
+# SLACK_WEBHOOK=${SLACK_WEBHOOK} (for Slack notifications)
+# DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME} (if using Docker Hub mirror)
+# DOCKERHUB_TOKEN=${DOCKERHUB_TOKEN} (if using Docker Hub mirror)
+#
+# GitHub integration:
+# - Connect CircleCI to GitHub repo
+# - Enable "Webhooks" for branches
+# - Status checks will appear on PRs automatically
+#
+# Slack integration:
+# - Run: circleci config validate
+# - Deploy: git push to trigger pipeline
+# - Slack notifications sent to #qa-alerts and #qa-team
+#
+
+# ============================================================================
+# NOTES FOR IMPLEMENTATION
+# ============================================================================
+#
+# 1. DOCKER IMAGE: cimg/python:3.11-browsers includes:
+#    - Python 3.11
+#    - Chrome, Firefox (Playwright browsers)
+#    - Build tools needed for pip dependencies
+#
+# 2. CACHING STRATEGY:
+#    - Pip packages cached by requirements.txt hash (~200MB)
+#    - Browser binaries cached separately (~800MB)
+#    - Invalidate manually if needed in CircleCI UI
+#
+# 3. PARALLELIZATION:
+#    - pytest-xdist distributes tests across containers
+#    - --dist=loadscope groups tests by class/file
+#    - Adjust `parallelism` value based on:
+#      * Available CircleCI credits
+#      * Test count and duration
+#      * Resource class (small=2CPU, medium=4CPU, large=8CPU)
+#
+# 4. ARTIFACT RETENTION:
+#    - CircleCI free tier: 30-day retention
+#    - Production: Consider S3 for longer retention
+#
+# 5. COST OPTIMIZATION:
+#    - Use `resource_class: small` for lightweight jobs
+#    - Use `medium` for UI tests (need browser)
+#    - Use `large` only for nightly full regression
+#    - Estimated monthly cost (free tier): $0 (limited credits)
+#
+# 6. TROUBLESHOOTING:
+#    - View logs: CircleCI UI → Job → Logs
+#    - Rerun failed jobs: Click \"Rerun\" button
+#    - SSH into container: Click \"Rerun with SSH\" for debugging
+#    - Check environment: ssh ubuntu@$CIRCLE_HOSTNAME
+#
+# 7. NEXT STEPS:
+#    - Push this yml file to .circleci/config.yml
+#    - Configure environment variables in CircleCI project settings
+#    - Connect GitHub repo to CircleCI
+#    - Create Slack webhook for notifications
+#    - Trigger first pipeline with git push
+#
