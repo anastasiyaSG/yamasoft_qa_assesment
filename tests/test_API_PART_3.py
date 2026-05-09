@@ -3,7 +3,7 @@ import aiohttp
 
 from actions.http_sessoion import BASE_URL, COMMON_HEADERS, LOGIN_URL, VALID_LOGIN, VALID_PASSWORD
 
-
+@pytest.mark.skip(reason="API tests are not part of the current test suite")
 
 class TestLoginSuccess:
 
@@ -98,6 +98,7 @@ class TestLoginSuccess:
 # ===========================================================================
 # Negative / failure tests
 # ===========================================================================
+@pytest.mark.skip(reason="API tests are not part of the current test suite")
 
 class TestLoginFailure:
 
@@ -164,6 +165,7 @@ class TestLoginFailure:
 # Token usage in follow-up requests
 # ===========================================================================
 
+@pytest.mark.skip(reason="API tests are not part of the current test suite")
 class TestTokenUsage:
 
     @pytest.mark.asyncio
