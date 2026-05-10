@@ -34,7 +34,7 @@ from actions.trip_creation import (
     trip_with_registration_with_stop,
     trip_without_registration_with_stop
 )
-from actions.http_sessoion import (
+from actions.http_session import (
     http_session,pre_auth_session, logged_in_session)
 
 # Pytest hooks for test execution

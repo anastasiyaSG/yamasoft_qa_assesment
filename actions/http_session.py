@@ -3,7 +3,7 @@ import aiohttp
 import pytest
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
-
+from yarl import URL
 load_dotenv()
 
 BASE_URL       = os.getenv("BASE_URL", "https://maps.roadtrippers.com").rstrip("/")
@@ -26,11 +26,12 @@ COMMON_HEADERS = {
 }
 
 
-def _get_session_id(cookie_jar) -> str | None:
-    for domain_cookies in cookie_jar._cookies.values():
-        if "_session_id" in domain_cookies:
-            return domain_cookies["_session_id"].value
-    return None
+
+
+def _get_session_id(cookie_jar, base_url: str) -> str | None:
+    cookies = cookie_jar.filter_cookies(URL(base_url))
+    cookie = cookies.get("_session_id")
+    return cookie.value if cookie else None
 
 
 async def _get_recaptcha_token_via_browser() -> tuple[str, str]:
@@ -44,10 +45,10 @@ async def _get_recaptcha_token_via_browser() -> tuple[str, str]:
         page = await context.new_page()
 
         await page.goto(f"{BASE_URL}/?lng=-98.35&lat=39.5&z=3.30945",
-                        wait_until="networkidle")
+                         wait_until="domcontentloaded", timeout=60000)
 
         # Wait for grecaptcha to be available on the page
-        await page.wait_for_function("typeof grecaptcha !== 'undefined'", timeout=15000)
+        await page.wait_for_function("typeof grecaptcha !== 'undefined'", timeout=30000)
 
         token = await page.evaluate(f"""
             () => new Promise((resolve, reject) => {{
@@ -80,7 +81,7 @@ async def pre_auth_session():
     async with aiohttp.ClientSession(headers=COMMON_HEADERS) as session:
         resp = await session.get(BASE_URL)
         await resp.read()
-        session_id = _get_session_id(session.cookie_jar)
+        session_id = _get_session_id(session.cookie_jar, BASE_URL)
         assert session_id is not None, (
             f"_session_id not set. Cookies: {dict(session.cookie_jar._cookies)}"
         )

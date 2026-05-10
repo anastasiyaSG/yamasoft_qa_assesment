@@ -114,10 +114,11 @@ async def set_up_create_trip(request):
         await context.tracing.start(screenshots=True, snapshots=True, sources=True)
  
         try:
-            await page.goto(URL)
+            await page.goto(URL,timeout=60000)
             logger.info("Navigated to %s", URL)
             await _dismiss_overlays(page)
  
+
             yield page
  
         finally:

@@ -1,19 +1,17 @@
 import pytest
 import aiohttp
 
-from actions.http_sessoion import BASE_URL, COMMON_HEADERS, LOGIN_URL, VALID_LOGIN, VALID_PASSWORD
+from actions.http_session import BASE_URL, COMMON_HEADERS, LOGIN_URL, VALID_LOGIN, VALID_PASSWORD
 
 @pytest.mark.skip(reason="API tests are not part of the current test suite")
 
 class TestLoginSuccess:
 
     @pytest.mark.asyncio
-    async def test_status_200(self, pre_auth_session):
-        """Successful login returns HTTP 200."""
-        async with pre_auth_session.post(
-            LOGIN_URL,
-            json={"login": VALID_LOGIN, "password": VALID_PASSWORD},
-        ) as resp:
+    async def test_status_200(self, logged_in_session):
+        session, _ = logged_in_session
+        # use the authenticated session for further API calls
+        async with session.get(f"{BASE_URL}/api/web/current_user") as resp:
             assert resp.status == 200
 
     @pytest.mark.asyncio
